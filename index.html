@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mojave Refinery — MVP (Phase 0/1)</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- HUD -->
+  <header class="hud">
+    <div class="title">
+      <strong>Mojave Refinery (MVP)</strong>
+      <span class="hint">Drag families → houses (left). Drag planes → pads (right). Drag canvas to pan. Scroll to zoom.</span>
+    </div>
+    <div class="stats">
+      <div>Day: <span id="day">1</span></div>
+      <div>Families Waiting: <span id="familiesWaiting">0</span></div>
+      <div>Houses Filled: <span id="housesFilled">0</span>/<span id="housesTotal">0</span></div>
+      <div class="sep"></div>
+      <div>Planes Waiting: <span id="planesWaiting">0</span></div>
+      <div>Pads Used: <span id="padsUsed">0</span>/<span id="padsTotal">0</span></div>
+      <button id="endDayBtn" class="btn">End Day</button>
+    </div>
+  </header>
+
+  <!-- Stage: two worlds + office strip -->
+  <main class="stage">
+    <section class="world housing">
+      <canvas id="housingCanvas"></canvas>
+      <div class="label">HOUSING</div>
+    </section>
+
+    <section class="office">
+      <div class="office-square front" id="officeSquare">
+        <!-- Officer character inside the bounded square -->
+        <div class="officer" id="officer" aria-label="officer" title="Officer">
+          <div class="officer-head"></div>
+          <div class="officer-body"></div>
+        </div>
+
+        <div class="office-card">
+          <div class="office-title">PLAYER OFFICE</div>
+          <div class="office-body">
+            <p>This is your central desk. We’ll place events, calls, and reports here later.</p>
+            <p>For now, focus on <b>left</b> (families → houses) and <b>right</b> (planes → pads).</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="world aircraft">
+      <canvas id="aircraftCanvas"></canvas>
+      <div class="label">AIRCRAFT BONEYARD</div>
+    </section>
+  </main>
+
+  <!-- Night summary (simple for MVP) -->
+  <div id="summary" class="summary hidden">
+    <div class="card">
+      <h3>Nightly Summary</h3>
+      <div id="summaryBody"></div>
+      <button id="closeSummary" class="btn">Start Next Day</button>
+    </div>
+  </div>
+
+  <script src="main.js"></script>
+</body>
+</html>
+
