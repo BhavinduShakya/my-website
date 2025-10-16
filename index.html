@@ -1,70 +1,160 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mojave Refinery — MVP (Phase 0/1)</title>
-  <link rel="stylesheet" href="styles.css" />
+  <title>Mojave Refinery — Zone 1: Disassembly Bay</title>
+
+  <!-- (You'll add the real CSS/JS later)
+       CSS file name suggestion: zone1.css
+       JS  file name suggestion: zone1.js
+  -->
+  <link rel="preload" href="ZONE ONE.jpg" as="image">
+  <link rel="preload" href="ZONE ONE (Maps).png" as="image">
+  <!-- Use prefetch for non-blocking future assets to avoid preload warnings if unused within a few seconds -->
+  <link rel="prefetch" href="ZONE TWO.jpg" as="image">
+  <link rel="prefetch" href="plane overlay 1.png" as="image">
+  <link rel="prefetch" href="plane overlay 2.png" as="image">
+  <link rel="prefetch" href="plane overlay 3.png" as="image">
+  <link rel="stylesheet" href="zone1.css">
+  <!-- Inline 1x1 favicon to avoid 404s in dev -->
+  <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAucB9U9PYiEAAAAASUVORK5CYII=">
 </head>
+
 <body>
-  <!-- HUD -->
-  <header class="hud">
-    <div class="title">
-      <strong>Mojave Refinery (MVP)</strong>
-      <span class="hint">Drag families → houses (left). Drag planes → pads (right). Drag canvas to pan. Scroll to zoom.</span>
-    </div>
-    <div class="stats">
-      <div>Day: <span id="day">1</span></div>
-      <div>Families Waiting: <span id="familiesWaiting">0</span></div>
-      <div>Houses Filled: <span id="housesFilled">0</span>/<span id="housesTotal">0</span></div>
-      <div class="sep"></div>
-      <div>Planes Waiting: <span id="planesWaiting">0</span></div>
-      <div>Pads Used: <span id="padsUsed">0</span>/<span id="padsTotal">0</span></div>
-      <button id="endDayBtn" class="btn">End Day</button>
-    </div>
-  </header>
-
-  <!-- Stage: two worlds + office strip -->
-  <main class="stage">
-    <section class="world housing">
-      <canvas id="housingCanvas"></canvas>
-      <div class="label">HOUSING</div>
-    </section>
-
-    <section class="office">
-      <div class="office-square front" id="officeSquare">
-        <!-- Officer character inside the bounded square -->
-        <div class="officer" id="officer" aria-label="officer" title="Officer">
-          <div class="officer-head"></div>
-          <div class="officer-body"></div>
-        </div>
-
-        <div class="office-card">
-          <div class="office-title">PLAYER OFFICE</div>
-          <div class="office-body">
-            <p>This is your central desk. We’ll place events, calls, and reports here later.</p>
-            <p>For now, focus on <b>left</b> (families → houses) and <b>right</b> (planes → pads).</p>
-          </div>
+  <!-- =========================
+       GAME WRAPPER
+       ========================= -->
+  <div id="game" aria-label="Zone 1: Disassembly Bay">
+    <!-- HUD / top bar -->
+    <header id="hud" aria-live="polite">
+      <div class="hud-left">
+        <strong>ZONE 1—Disassembly</strong>
+        <span id="hud-msg">Walk to a highlighted part to begin.</span>
+      </div>
+      <div class="hud-center">
+        <span>Shift: sprint</span>
+        <span>Space: interact</span>
+        <span>Esc: pause</span>
+      </div>
+      <div class="hud-right">
+        <span>Salvage:</span> <b id="hud-salvage">0</b>
+        <span class="sep">|</span>
+        <span>Quality:</span> <b id="hud-quality">100%</b>
+        <span class="sep">|</span>
+        <span>Crates:</span> <b id="hud-crates">0</b>
+        <span class="sep">|</span>
+        <span>People Waiting:</span> <b id="hud-people">0</b>
+        <span class="sep">|</span>
+        <div class="hud-actions">
+          <button id="btn-help" type="button">Help</button>
+          <button id="btn-reset" type="button">Reset Zone</button>
+          <button id="btn-continue" type="button" disabled>Send Crates →</button>
         </div>
       </div>
-    </section>
+    </header>
 
-    <section class="world aircraft">
-      <canvas id="aircraftCanvas"></canvas>
-      <div class="label">AIRCRAFT BONEYARD</div>
-    </section>
-  </main>
+    <!-- Viewport/canvas layer (JS will draw here) -->
+    <main id="viewport" role="application" aria-label="Isometric workspace">
+      <!-- We’ll draw on the main canvas; the second canvas is optional for effects -->
+    <canvas id="world" width="1600" height="900"></canvas>
+    <canvas id="fx" width="1600" height="900" aria-hidden="true"></canvas>
+    <!-- Text bubble layer for crowd voices (DOM, pointer-events: none) -->
+    <div id="voices" aria-hidden="true"></div>
 
-  <!-- Night summary (simple for MVP) -->
-  <div id="summary" class="summary hidden">
+      <!-- Hidden images the JS will use -->
+    <img id="img-base" src="ZONE ONE.jpg" alt="Zone One base illustration" hidden>
+  <img id="img-mask" src="ZONE ONE (Maps).png" alt="Zone One navigation & hotspot mask" hidden>
+    <!-- Optional Zone 2 base to stitch to the right; safe if missing -->
+  <img id="img-base2" src="ZONE TWO.jpg" alt="Zone Two base illustration" hidden>
+    <!-- Plane overlay images for timed arrivals -->
+    <img id="plane-overlay-1" src="plane overlay 1.png" alt="Plane overlay 1" hidden>
+    <img id="plane-overlay-2" src="plane overlay 2.png" alt="Plane overlay 2" hidden>
+    <img id="plane-overlay-3" src="plane overlay 3.png" alt="Plane overlay 3" hidden>
+
+      <!-- Optional: placeholder sprite sheet (swap later) -->
+      <img id="img-sprite" src="worker-sprite.png" alt="Worker sprite" hidden>
+    </main>
+
+    <!-- Bottom dock removed per request -->
+  </div>
+
+  <!-- =========================
+       OVERLAYS / MODALS
+       (JS will open/close these)
+       ========================= -->
+
+  <!-- Pause / Help -->
+  <div id="overlay-help" class="overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="help-title">
     <div class="card">
-      <h3>Nightly Summary</h3>
-      <div id="summaryBody"></div>
-      <button id="closeSummary" class="btn">Start Next Day</button>
+      <h2 id="help-title">How to play Zone 1</h2>
+      <ol>
+        <li>Move to a red-highlighted aircraft part to start disassembly.</li>
+        <li>Some parts require <em>precision cutting</em>. Others require <em>bolt removal</em>.</li>
+        <li>Higher precision &nbsp;→&nbsp; higher quality & more salvage.</li>
+        <li>When crates are full, press <em>Send Crates</em> to ship materials to storage.</li>
+      </ol>
+      <p class="tip">Tip: hold <kbd>Shift</kbd> to sprint. Press <kbd>Esc</kbd> to pause.</p>
+      <button class="close" data-close="#overlay-help">Close</button>
     </div>
   </div>
 
-  <script src="main.js"></script>
+  <!-- Precision Cutting Minigame -->
+  <div id="overlay-cut" class="overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="cut-title">
+    <div class="card wide">
+      <h2 id="cut-title">Precision Cutting</h2>
+      <p class="sub">Trace the path accurately to free the panel.</p>
+      <canvas id="cut-canvas" width="1024" height="512"></canvas>
+      <div class="actions">
+        <button id="cut-cancel" type="button">Cancel</button>
+        <button id="cut-confirm" type="button" disabled>Confirm Cut</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sequential Torque Minigame -->
+  <div id="overlay-bolt" class="overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="torque-title">
+    <div class="card">
+      <h2 id="torque-title">Sequential Torque</h2>
+      <p class="sub">Time your press when the needle passes the green zone to loosen the bolt.</p>
+      <canvas id="torque-canvas" width="520" height="520" aria-label="Torque gauge"></canvas>
+      <div id="torque-readout" class="readout" aria-live="polite">Bolt Integrity: 100%</div>
+      <div class="actions">
+        <button id="torque-cancel" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hold the Frame Minigame -->
+  <div id="overlay-hold" class="overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="hold-title">
+    <div class="card wide">
+      <h2 id="hold-title">Hold the Frame</h2>
+      <p class="sub">Keep the suspended component within the stability zone until clamps engage.</p>
+      <canvas id="hold-canvas" width="1024" height="540" aria-label="Structural balance test"></canvas>
+      <div class="actions">
+        <button id="hold-cancel" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results / End-of-Shift -->
+  <div id="overlay-results" class="overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="results-title">
+    <div class="card">
+      <h2 id="results-title">Shift Summary</h2>
+      <ul id="results-list">
+        <!-- JS will populate -->
+      </ul>
+      <div class="actions">
+        <button id="results-close" type="button">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- (Optional) include later:
+  <link rel="stylesheet" href="zone1.css" />
+  <script src="zone1.js" type="module"></script>
+  -->
+  <script src="./main.js"></script>
 </body>
 </html>
 
