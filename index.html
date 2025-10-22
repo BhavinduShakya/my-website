@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mojave Refinery — Zone 1: Disassembly Bay</title>
+
+  <!-- (You'll add the real CSS/JS later)
+       CSS file name suggestion: zone1.css
+       JS  file name suggestion: zone1.js
+  -->
+  <!-- Removed preload to avoid Chrome warnings about not being used immediately -->
+  <!-- Prefetch the incoming plane overlay and its mask so the first arrival is ready -->
+  <link rel="prefetch" href="baseimages/PLANEOVERLAY1.png" as="image">
+  <link rel="prefetch" href="baseimages/PLANEOVERLAY1 COLORS.png" as="image">
+  <link rel="stylesheet" href="./zone1.css?v=1">
+  <!-- Mechanical display fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700&family=Rajdhani:wght@500;600&display=swap" rel="stylesheet">
+  <!-- OCR A Extended (for value overlays) -->
+  <link rel="stylesheet" href="https://fonts.cdnfonts.com/css/ocr-a-extended">
+  <!-- Inline 1x1 favicon to avoid 404s in dev -->
+  <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAucB9U9PYiEAAAAASUVORK5CYII=">
+</head>
+
+<body>
+  <!-- SVG HUD overlay (Illustrator export injected here; click-through) -->
+  <div id="hud-overlay" aria-hidden="false"></div>
+  <!-- Threshold Scene (empty container; JS inlines WORK ORDER.svg here) -->
+  <section id="threshold" aria-label="The Threshold Scene" role="dialog" aria-modal="true"></section>
+  <!-- Shift Clock Transition Overlay -->
+  <div id="shift-clock" aria-hidden="true">
+    <div class="clock" aria-live="polite">09:00 AM</div>
+  </div>
+  
+  <!-- =========================
+       GAME WRAPPER
+       ========================= -->
+  <div id="game" aria-label="Zone 1: Disassembly Bay">
+    <!-- HUD / top bar -->
+    <header id="hud" aria-live="polite">
+      <div class="hud-left">
+        <strong>ZONE 1—Disassembly</strong>
+        <span id="hud-msg">Walk to a highlighted part to begin.</span>
+      </div>
+      <div class="hud-center">
+        <span>Shift: sprint</span>
+        <span>Space: interact</span>
+        <span>Esc: pause</span>
+      </div>
+      <div class="hud-right">
+        <span>Salvage:</span> <b id="hud-salvage">0</b>
+        <span class="sep">|</span>
+        <span>Quality:</span> <b id="hud-quality">100%</b>
+        <span class="sep">|</span>
+        <span>Crates:</span> <b id="hud-crates">0</b>
+        <span class="sep">|</span>
+        <span>People Waiting:</span> <b id="hud-people">0</b>
+        <span class="sep">|</span>
+        <span>Homes:</span> <b id="hud-homes" class="hud-pulse-target">0</b>
+        <span class="sep">|</span>
+        <span class="materials-display">
+          <span class="material-item">
+            <span class="material-label">Steel:</span>
+            <b id="hud-steel" class="hud-pulse-target">0</b>
+          </span>
+          <span class="material-item">
+            <span class="material-label">Plastic:</span>
+            <b id="hud-plastic" class="hud-pulse-target">0</b>
+          </span>
+          <span class="material-item">
+            <span class="material-label">Composite:</span>
+            <b id="hud-composite" class="hud-pulse-target">0</b>
+          </span>
+        </span>
+        <span class="sep">|</span>
+        <span id="hud-clock" class="hud-clock" aria-hidden="true">09:01 AM</span>
+        <span class="sep">|</span>
+        <div class="hud-actions">
+          <button id="btn-pause" type="button">Pause</button>
+          <button id="btn-help" type="button">Help</button>
+          <button id="btn-reset" type="button">Reset Zone</button>
+          <button id="btn-continue" type="button" disabled>Send Crates →</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Viewport/canvas layer (JS will draw here) -->
+    <main id="viewport" role="application" aria-label="Isometric workspace">
+      <!-- Zone HUD sidebar (vertical, clamped inside active panel on the right) -->
+      <nav id="zone-strip" aria-label="Zone HUD">
+        <!-- Minimap at top of the sidebar -->
+        <div id="minimap" aria-label="Mini map" hidden>
+          <canvas id="minimap-canvas" width="160" height="110"></canvas>
+          <a href="plan.html" class="cta" id="minimap-cta" aria-label="Learn more about plan">LEARN MORE ABOUT PLAN</a>
+        </div>
+        <!-- Live status rows beneath minimap -->
+        <div id="tb-inline" class="vertical" role="group" aria-label="Status">
+          <span class="tb-box"><em>LOCAL TIME</em><b id="tb-time">09:01 AM</b></span>
+          <span class="tb-box"><em>SHIFT NUMBER</em><b id="tb-shift">1</b></span>
+          <span class="tb-box"><em>PEOPLE NEEDING HOUSES</em><b id="tb-people">0</b></span>
+          <span class="tb-box"><em>NEXT AIRCRAFT ARRIVAL</em><b id="tb-arrival">00:00</b></span>
+          <!-- Material inventory boxes -->
+          <span class="tb-box tb-material"><em>STEEL</em><b id="tb-steel" class="tb-pulse-target">0</b></span>
+          <span class="tb-box tb-material"><em>PLASTIC</em><b id="tb-plastic" class="tb-pulse-target">0</b></span>
+          <span class="tb-box tb-material"><em>COMPOSITE</em><b id="tb-composite" class="tb-pulse-target">0</b></span>
+          <span class="tb-box tb-homes"><em>HOMES COMPLETED</em><b id="tb-homes" class="tb-pulse-target">0</b></span>
+        </div>
+        <!-- Zone quick-nav buttons stacked -->
+        <div class="zones-col" role="group" aria-label="Zones">
+          <button type="button" class="zone-btn" id="btn-zone-1">ZONE 1</button>
+          <button type="button" class="zone-btn" id="btn-zone-2">ZONE 2</button>
+          <button type="button" class="zone-btn" id="btn-zone-3">ZONE 3</button>
+          <button type="button" class="zone-btn" id="btn-zone-4">ZONE 4</button>
+          <button type="button" class="zone-btn" id="btn-zone-5">ZONE 5</button>
+          <button type="button" class="zone-btn" id="btn-zone-6">ZONE 6</button>
+          <button type="button" class="zone-btn" id="btn-zone-7">ZONE 7</button>
+          <button type="button" class="zone-btn" id="btn-zone-8">ZONE 8</button>
+        </div>
+      </nav>
+      <!-- We’ll draw on the main canvas; the second canvas is optional for effects -->
+    <canvas id="world" width="1600" height="900"></canvas>
+    <canvas id="fx" width="1600" height="900" aria-hidden="true"></canvas>
+    <!-- Text bubble layer for crowd voices (DOM, pointer-events: none) -->
+    <div id="voices" aria-hidden="true"></div>
+    
+
+      <!-- Hotspot hint textbox -->
+    <div id="hotspot-hint" hidden style="position:absolute;pointer-events:none;transform:translate(-50%,-100%);padding:8px 10px;border-radius:6px;background:#c82333;color:#fff;font-weight:600;box-shadow:0 4px 10px rgba(0,0,0,0.35);white-space:nowrap;">Press E to Disassemble Part</div>
+
+      <!-- Hidden images the JS will use -->
+  <img id="img-base" src="baseimages/BACKGROUND BASE.png" alt="Background base" hidden fetchpriority="high" decoding="async">
+  <img id="img-mask" src="baseimages/BACKGROUND COLORS.png" alt="Background navigation/hotspot/collision mask" hidden fetchpriority="high" decoding="async">
+    <!-- Second mask for overlay hotspots/navmesh -->
+  <img id="img-mask2" src="baseimages/PLANEOVERLAY1 COLORS.png" alt="Plane overlay nav/hotspot mask" hidden>
+  <!-- Plane overlay image for timed arrivals -->
+  <img id="plane-overlay-1" src="baseimages/PLANEOVERLAY1.png" alt="Plane overlay 1" hidden>
+
+  <!-- Optional: placeholder sprite sheet (swap later) -->
+  <img id="img-sprite" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAucB9U9PYiEAAAAASUVORK5CYII=" alt="Worker sprite" hidden>
+  <!-- Silhouette assets for crowd agents (loaded via DOM query in main.js) -->
+  <img data-silhouette src="figures/figure1.png" alt="figure1" hidden>
+  <img data-silhouette src="figures/figure2.png" alt="figure2" hidden>
+  <img data-silhouette src="figures/figure3.png" alt="figure3" hidden>
+  <img data-silhouette src="figures/figure4.png" alt="figure4" hidden>
+  <img data-silhouette src="figures/figure5.png" alt="figure5" hidden>
+  <img data-silhouette src="figures/figure6.png" alt="figure6" hidden>
+  <img data-silhouette src="figures/figure7.png" alt="figure7" hidden>
+  <img data-silhouette src="figures/figure8.png" alt="figure8" hidden>
+  <img data-silhouette src="figures/figure9.png" alt="figure9" hidden>
+  <img data-silhouette src="figures/figure10.png" alt="figure10" hidden>
+    </main>
+
+    <!-- Bottom dock removed per request -->
+  </div>
+
+  <!-- =========================
+       OVERLAYS / MODALS
+       (JS will open/close these)
+       ========================= -->
+
+  <!-- Pause / Help -->
+  <div id="overlay-help" class="overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="help-title">
+    <div class="card">
+      <h2 id="help-title">How to play Zone 1</h2>
+      <ol>
+        <li>Move to a red-highlighted aircraft part to start disassembly.</li>
+        <li>Some parts require <em>precision cutting</em>. Others require <em>bolt removal</em>.</li>
+        <li>Higher precision &nbsp;→&nbsp; higher quality & more salvage.</li>
+        <li>When crates are full, press <em>Send Crates</em> to ship materials to storage.</li>
+      </ol>
+      <p class="tip">Tip: hold <kbd>Shift</kbd> to sprint. Press <kbd>Esc</kbd> to pause.</p>
+      <button class="close" data-close="#overlay-help">Close</button>
+    </div>
+  </div>
+
+  <!-- Precision Cutting Minigame -->
+  <div id="overlay-cut" class="overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="cut-title">
+    <div class="card wide">
+      <h2 id="cut-title">Precision Cutting</h2>
+      <p class="sub">Trace the path accurately to free the panel.</p>
+      <canvas id="cut-canvas" width="1024" height="512"></canvas>
+      <div class="actions">
+        <button id="cut-cancel" type="button">Cancel</button>
+        <button id="cut-confirm" type="button" disabled>Confirm Cut</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sequential Torque Minigame -->
+  <div id="overlay-bolt" class="overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="torque-title">
+    <div class="card">
+      <h2 id="torque-title">Sequential Torque</h2>
+      <p class="sub">Time your press when the needle passes the green zone to loosen the bolt.</p>
+      <canvas id="torque-canvas" width="520" height="520" aria-label="Torque gauge"></canvas>
+      <div id="torque-readout" class="readout" aria-live="polite">Bolt Integrity: 100%</div>
+      <div class="actions">
+        <button id="torque-cancel" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Hold the Frame Minigame -->
+  <div id="overlay-hold" class="overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="hold-title">
+    <div class="card wide">
+      <h2 id="hold-title">Hold the Frame</h2>
+      <p class="sub">Keep the suspended component within the stability zone until clamps engage.</p>
+      <canvas id="hold-canvas" width="1024" height="540" aria-label="Structural balance test"></canvas>
+      <div class="actions">
+        <button id="hold-cancel" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results / End-of-Shift -->
+  <div id="overlay-results" class="overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="results-title">
+    <div class="card">
+      <h2 id="results-title">Shift Summary</h2>
+      <ul id="results-list">
+        <!-- JS will populate -->
+      </ul>
+      <div class="actions">
+        <button id="results-close" type="button">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- (Optional) include later:
+  <link rel="stylesheet" href="zone1.css" />
+  <script src="zone1.js" type="module"></script>
+  -->
+  <script src="./main.js"></script>
+</body>
+</html>
+

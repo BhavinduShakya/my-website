@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Plan Viewer</title>
+  <style>
+    html, body { height:100%; }
+    body{ margin:0; background:#fff; color:#111; display:flex; align-items:center; justify-content:center; min-height:100dvh; }
+    .wrap{ max-width:95vw; max-height:95vh; }
+    .wrap img{ display:block; max-width:100%; max-height:100%; height:auto; width:auto; image-rendering:auto; }
+    .topbar{ position:fixed; top:0; left:0; right:0; display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:#fff; border-bottom:1px solid #ddd; }
+    .back{ text-decoration:none; color:#111; font-weight:800; letter-spacing:.06em; border:1px solid #111; padding:6px 10px; border-radius:0; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <a class="back" href="index.html#fromPlan" aria-label="Back to game">\u2190 BACK TO GAME</a>
+    <div style="font-weight:800; letter-spacing:.06em;">PLAN VIEWER</div>
+    <span></span>
+  </div>
+  <div class="wrap" aria-label="Updated Plan Image">
+    <img src="UI/planbaseupdated.jpg" alt="Updated plan" />
+  </div>
+</body>
+</html>

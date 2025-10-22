@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080">
+  <defs>
+    <style>
+      .cls-1 {
+        letter-spacing: -.02em;
+      }
+
+      .cls-2 {
+        letter-spacing: -.04em;
+      }
+
+      .cls-3 {
+        fill: red;
+      }
+
+      .cls-3, .cls-4 {
+        stroke-width: 0px;
+      }
+
+      .cls-5 {
+        letter-spacing: 0em;
+      }
+
+      .cls-6 {
+        font-family: MyriadPro-Regular, 'Myriad Pro';
+        font-size: 67.31px;
+      }
+
+      .cls-7 {
+        letter-spacing: .03em;
+      }
+
+      .cls-8 {
+        letter-spacing: 0em;
+      }
+
+      .cls-9 {
+        letter-spacing: 0em;
+      }
+
+      .cls-4 {
+        fill: blue;
+      }
+    </style>
+  </defs>
+  <rect class="cls-3" y="108.07" width="1535.75" height="863.86"/>
+  <rect class="cls-4" x="1535.75" y="108.07" width="384.25" height="863.86"/>
+  <text class="cls-6" transform="translate(427.73 540)"><tspan class="cls-1" x="0" y="0">A</tspan><tspan class="cls-7" x="40.18" y="0">C</tspan><tspan x="81.1" y="0">TIVE G</tspan><tspan class="cls-9" x="259.06" y="0">A</tspan><tspan class="cls-8" x="299.98" y="0">ME</tspan><tspan class="cls-2" x="387.21" y="0"> </tspan><tspan x="399.06" y="0">VI</tspan><tspan class="cls-5" x="452.7" y="0">E</tspan><tspan x="486.42" y="0">WPO</tspan><tspan class="cls-5" x="625.54" y="0">R</tspan><tspan x="662.36" y="0">T</tspan></text>
+  <text class="cls-6" transform="translate(1667.69 540.74)"><tspan x="0" y="0">HUD</tspan></text>
+</svg>
