@@ -167,7 +167,7 @@ __dbg.log('[zone1] main.js executing');
     },
     // Housing conversion recipe
     housing: {
-      recipe: { steel: 50, plastic: 50, composite: 50 },
+      recipe: { steel: 15, plastic: 15, composite: 15 },
       peoplePerHome: 10,     // Reduce people waiting by this amount per home
       completionTone: true,  // Play distinct tone when home is completed
       flashDurationMs: 400   // HUD flash duration for home completion
@@ -548,7 +548,7 @@ __dbg.log('[zone1] main.js executing');
     _lastResidueAgeAt: 0,
     // Titlebar runtime state
     shiftNo: 1,
-    clock: { h: 9, m: 1, pm: false, nextTickAt: 0, paceSecPerMin: 1 }, // starts 09:01 AM after intro
+    clock: { h: 9, m: 1, pm: false, nextTickAt: 0, paceSecPerMin: 0.125 }, // starts 09:01 AM after intro - 60 sec real time = 480 min game time (9am to 5pm)
     nextArrivalSec: 0,
     _lastUIActiveAt: 0,
     // minimap runtime
@@ -959,6 +959,22 @@ __dbg.log('[zone1] main.js executing');
       };
       loadFirstAvailable().then(({svg, path}) => {
         if (!svg) return;
+        
+        // Update work order number in the SVG
+        try {
+          const workOrderNum = parseInt(localStorage.getItem('workOrderNumber') || '1', 10);
+          // Find text elements that contain "WORK ORDER"
+          const workOrderTexts = Array.from(svg.querySelectorAll('text, tspan')).filter(t => 
+            /WORK\s+ORDER/i.test((t.textContent || ''))
+          );
+          workOrderTexts.forEach(t => {
+            const currentText = t.textContent || '';
+            // Replace "WORK ORDER 1" or "WORK ORDER 01" with new number
+            const updatedText = currentText.replace(/WORK\s+ORDER\s+\d+/i, `WORK ORDER ${workOrderNum}`);
+            t.textContent = updatedText;
+          });
+        } catch {}
+        
         // Normalize text to black, and convert small white outlines to black (preserve large backgrounds)
         try{
           const isWhite = (v) => {
@@ -2447,11 +2463,22 @@ __dbg.log('[zone1] main.js executing');
     let { h, m, pm } = state.clock;
     m += 1; if (m >= 60){ m = 0; h += 1; if (h === 12){ pm = !pm; } if (h > 12){ h = 1; } }
     state.clock.h = h; state.clock.m = m; state.clock.pm = pm;
+    // Check if shift ends at 5:00 PM
+    if (h === 5 && m === 0 && pm) {
+      endShift();
+    }
   }
   function formatClock(){
     const { h, m, pm } = state.clock; return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')} ${pm?'PM':'AM'}`;
   }
   function flashTitlebar(){ try{ if (!els.tb) return; els.tb.classList.add('active'); state._lastUIActiveAt = performance.now(); setTimeout(()=> els.tb.classList.remove('active'), 360); }catch{} }
+
+  function endShift(){
+    // Pause the game
+    state.paused = true;
+    // Show shift summary popup (work order style)
+    showShiftSummary();
+  }
 
   function togglePause(force){
     state.paused = (typeof force === 'boolean') ? force : !state.paused;
@@ -2461,6 +2488,104 @@ __dbg.log('[zone1] main.js executing');
       els.viewport.style.filter = state.paused ? 'grayscale(0.1) brightness(0.92)' : '';
       els.hudMsg.textContent = state.paused ? 'Paused' : 'Walk to a highlighted part to begin.';
     }catch{}
+  }
+
+  /* ----------------------- STATS POPUPS (Work Order Style) ----------------------- */
+  function showDeliveryStats(steel, plastic, composite, precision){
+    // Create popup overlay
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:10001;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);animation:fadeIn 0.2s ease;';
+    
+    const card = document.createElement('div');
+    card.style.cssText = 'background:#ffffff;border:3px solid #000000;padding:50px;max-width:600px;font-family:ui-monospace,SFMono-Regular,"Courier New",monospace;box-shadow:0 20px 60px rgba(0,0,0,0.5);animation:slideIn 0.3s ease;';
+    
+    // Header
+    const header = document.createElement('div');
+    header.style.cssText = 'font-size:28px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;border-bottom:3px solid #000000;padding-bottom:20px;margin-bottom:28px;color:#000000;';
+    header.textContent = 'MATERIALS DELIVERED';
+    
+    // Stats content
+    const content = document.createElement('div');
+    content.style.cssText = 'font-size:16px;line-height:1.8;margin-bottom:24px;color:#000000;';
+    content.innerHTML = `
+      <div style="margin-bottom:12px;color:#000000;">STEEL: <span style="float:right;font-weight:600;color:#000000;">+${steel}</span></div>
+      <div style="margin-bottom:12px;color:#000000;">PLASTIC: <span style="float:right;font-weight:600;color:#000000;">+${plastic}</span></div>
+      <div style="margin-bottom:12px;color:#000000;">COMPOSITE: <span style="float:right;font-weight:600;color:#000000;">+${composite}</span></div>
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid #000000;color:#000000;">PRECISION: <span style="float:right;font-weight:600;color:#000000;">${precision.toFixed(0)}%</span></div>
+    `;
+    
+    // Close button
+    const btn = document.createElement('button');
+    btn.style.cssText = 'background:#ffffff;border:3px solid #000000;color:#000000;padding:14px 28px;font:600 16px ui-monospace,SFMono-Regular,"Courier New",monospace;letter-spacing:0.05em;cursor:pointer;width:100%;margin-top:20px;border-top:3px solid #000000;padding-top:28px;transition:all 0.15s ease;';
+    btn.textContent = 'CONTINUE';
+    btn.onmouseover = () => { btn.style.background = '#000000'; btn.style.color = '#ffffff'; };
+    btn.onmouseout = () => { btn.style.background = '#ffffff'; btn.style.color = '#000000'; };
+    btn.onclick = () => overlay.remove();
+    
+    card.appendChild(header);
+    card.appendChild(content);
+    card.appendChild(btn);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+    
+    // Auto-close after 5 seconds
+    setTimeout(() => { if (overlay.parentNode) overlay.remove(); }, 5000);
+  }
+
+  function showShiftSummary(){
+    // Create popup overlay
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:10001;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);animation:fadeIn 0.2s ease;';
+    
+    const card = document.createElement('div');
+    card.style.cssText = 'background:#ffffff;border:3px solid #000000;padding:50px;max-width:700px;font-family:ui-monospace,SFMono-Regular,"Courier New",monospace;box-shadow:0 20px 60px rgba(0,0,0,0.5);animation:slideIn 0.3s ease;';
+    
+    // Get current work order number from localStorage
+    const workOrderNum = parseInt(localStorage.getItem('workOrderNumber') || '1', 10);
+    
+    // Header
+    const header = document.createElement('div');
+    header.style.cssText = 'font-size:28px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;border-bottom:3px solid #000000;padding-bottom:20px;margin-bottom:28px;color:#000000;';
+    header.textContent = `SHIFT ${String(workOrderNum).padStart(2, '0')}: SUMMARY`;
+    
+    // Stats content
+    const content = document.createElement('div');
+    content.style.cssText = 'font-size:16px;line-height:1.8;margin-bottom:24px;color:#000000;';
+    content.innerHTML = `
+      <div style="margin-bottom:20px;font-weight:600;text-transform:uppercase;color:#000000;">Materials Collected:</div>
+      <div style="margin-bottom:8px;padding-left:20px;color:#000000;">Steel: <span style="float:right;font-weight:600;color:#000000;">${state.materials.steel}</span></div>
+      <div style="margin-bottom:8px;padding-left:20px;color:#000000;">Plastic: <span style="float:right;font-weight:600;color:#000000;">${state.materials.plastic}</span></div>
+      <div style="margin-bottom:8px;padding-left:20px;color:#000000;">Composite: <span style="float:right;font-weight:600;color:#000000;">${state.materials.composite}</span></div>
+      <div style="margin-top:20px;padding-top:16px;border-top:1px solid #000000;color:#000000;">
+        <div style="margin-bottom:8px;color:#000000;">Crates Delivered: <span style="float:right;font-weight:600;color:#000000;">${state.cratesLoaded || 0}</span></div>
+        <div style="margin-bottom:8px;color:#000000;">Homes Completed: <span style="float:right;font-weight:600;color:#000000;">${state.homesCompleted}</span></div>
+        <div style="margin-bottom:8px;color:#000000;">Quality Rating: <span style="float:right;font-weight:600;color:#000000;">${state.quality.toFixed(0)}%</span></div>
+      </div>
+      <div style="margin-top:24px;padding-top:20px;border-top:2px solid #000000;font-size:14px;text-align:center;color:#000000;">
+        SHIFT ENDED AT 05:00 PM
+      </div>
+    `;
+    
+    // Close button
+    const btn = document.createElement('button');
+    btn.style.cssText = 'background:#ffffff;border:3px solid #000000;color:#000000;padding:14px 28px;font:600 16px ui-monospace,SFMono-Regular,"Courier New",monospace;letter-spacing:0.05em;cursor:pointer;width:100%;margin-top:28px;transition:all 0.15s ease;';
+    btn.textContent = 'END SHIFT';
+    btn.onmouseover = () => { btn.style.background = '#000000'; btn.style.color = '#ffffff'; };
+    btn.onmouseout = () => { btn.style.background = '#ffffff'; btn.style.color = '#000000'; };
+    btn.onclick = () => {
+      overlay.remove();
+      // Increment work order number for next shift
+      const currentNum = parseInt(localStorage.getItem('workOrderNumber') || '1', 10);
+      localStorage.setItem('workOrderNumber', String(currentNum + 1));
+      // Could reload or go to a new screen here
+      location.reload();
+    };
+    
+    card.appendChild(header);
+    card.appendChild(content);
+    card.appendChild(btn);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
   }
 
   /* --------------------------- FX LAYER ------------------------- */
@@ -3276,9 +3401,9 @@ __dbg.log('[zone1] main.js executing');
     if (state.activeZone === 0) {
       // Check if carrying crate and near delivery zone
       if (state.carryingCrateId && isNearDeliveryZone(state.player.x, state.player.y)) {
-        els.hudMsg.textContent = 'DROP CRATE (E) — Deliver materials';
+        els.hudMsg.textContent = 'Drop Off Zone — Press E to drop materials.';
       } else if (state.carryingCrateId) {
-        els.hudMsg.textContent = 'Carrying crate — Take to delivery zone';
+        els.hudMsg.textContent = 'Carrying materials — Take to drop off zone';
       } else {
         const hs = getNearestHotspotWithin(CONFIG.hotspotProximity);
         if (hs) {
@@ -3587,12 +3712,15 @@ __dbg.log('[zone1] main.js executing');
       // Draw Zone 2 intersection if present
       if (base2W > 0){ drawIntersection(els.imgBase2, base1W, 0, base2W, base2H || base1H); }
     }
-  // Plane arrival overlays (above base)
-  drawPlaneOverlays(ctx, layout.center);
-  // Render red/grey overlays for dismantle areas from the mask islands ON TOP of plane overlays
-  drawIslandOverlays(ctx, layout.center);
-  // Logistics draw on top of world (below crowd/UI)
-  drawLogistics(ctx, layout.center);
+  // Only render game activity in Zone 1
+  if (state.activeZone === 0) {
+    // Plane arrival overlays (above base)
+    drawPlaneOverlays(ctx, layout.center);
+    // Render red/grey overlays for dismantle areas from the mask islands ON TOP of plane overlays
+    drawIslandOverlays(ctx, layout.center);
+    // Logistics draw on top of world (below crowd/UI)
+    drawLogistics(ctx, layout.center);
+  }
     // Visual Residue — accumulate voices as multiply layer mapped to world
     // Skip when no meaningful residue is present to avoid a full-canvas blend each frame
     if (state.residueCan && (state.residueScore > 0.02)) {
@@ -3648,8 +3776,13 @@ __dbg.log('[zone1] main.js executing');
         try { buildNavMesh(); } catch{}
       }
     }
-    // Crowd (world-anchored) above overlays and logistics, below player/UI
-    drawCrowdWorld(ctx, layout.center);
+    // Only render crowd and crate text in Zone 1
+    if (state.activeZone === 0) {
+      // Crowd (world-anchored) above overlays and logistics, below player/UI
+      drawCrowdWorld(ctx, layout.center);
+      // Draw carried crate text on top of everything so it's always visible
+      drawCarriedCrateText(ctx);
+    }
     // Background tinting disabled: keep original artwork colors with no red wash
     ctx.restore();
 
@@ -3691,15 +3824,26 @@ __dbg.log('[zone1] main.js executing');
       const sLeft = Math.max(0, Math.ceil((state.nextArrivalAt - now)/1000));
       setHudArrival(sLeft);
       state.nextArrivalSec = sLeft;
+      // Always update countdown popup regardless of hotspot proximity
+      updateArrivalCountdown(sLeft);
+    } else {
+      // Hide countdown when no active arrival
+      updateArrivalCountdown(-1);
     }
   // Hum removed per request
   state.humGain = 0; try{ stopHum && stopHum(); }catch{}
 
     if (!state.arrivalUsed && now >= state.nextArrivalAt){
       enqueuePlaneOverlay();
-      state.arrivalUsed = true; // Only show once
+      state.arrivalCount = (state.arrivalCount || 0) + 1;
+      // Schedule next arrival if we haven't reached the limit
+      if (state.arrivalCount < 15) {
+        state.nextArrivalAt = now + state.planeTimerMs;
+        state.arrivalUsed = false;
+      } else {
+        state.arrivalUsed = true; // Stop after 15 arrivals
+      }
       try{ flashTitlebar(); }catch{}
-      // Do not reschedule another arrival; leave nextArrivalAt as-is (unused)
     }
   }
 
@@ -3718,14 +3862,45 @@ __dbg.log('[zone1] main.js executing');
     }catch{}
   }
 
+  function updateArrivalCountdown(sec){
+    if (sec <= 10 && sec > 0){
+      // Create or show countdown popup
+      let popup = document.getElementById('arrival-countdown-popup');
+      if (!popup){
+        popup = document.createElement('div');
+        popup.id = 'arrival-countdown-popup';
+        // Position in top left corner with same dimensions as delivery zone (200x100)
+        popup.style.cssText = 'position:fixed;top:20px;left:20px;width:200px;height:100px;background:rgba(200,35,51,0.5);color:#ffffff;padding:0;border:2px dashed #000000;font:700 24px ui-monospace,SFMono-Regular,"Courier New",monospace;letter-spacing:0.08em;z-index:20000;box-shadow:0 4px 12px rgba(0,0,0,0.3);animation:flashCountdown 0.5s infinite;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;';
+        document.body.appendChild(popup);
+        
+        // Add flash animation
+        if (!document.getElementById('countdown-flash-style')){
+          const style = document.createElement('style');
+          style.id = 'countdown-flash-style';
+          style.textContent = '@keyframes flashCountdown { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }';
+          document.head.appendChild(style);
+        }
+      }
+      popup.innerHTML = '<div style="font-size:11px;font-weight:600;letter-spacing:0.12em;margin-bottom:4px;">NEXT AIRCRAFT<br>ARRIVING IN</div><div style="font-size:32px;font-weight:700;line-height:1;">' + sec + '</div>';
+      popup.style.display = 'flex';
+    } else {
+      // Hide countdown popup
+      const popup = document.getElementById('arrival-countdown-popup');
+      if (popup) popup.style.display = 'none';
+    }
+  }
+
   function enqueuePlaneOverlay(){
     if (!state.planeImgs.length) return;
     // pick next image cyclically
   const idx = state.overlays.length % state.planeImgs.length;
   const entry = state.planeImgs[idx];
-  // Align overlay artwork exactly with the base so it matches nav/hotspot masks
-  const xOff = 0;
-  const yOff = 0;
+  // Add slight variation in position for each arrival
+  const arrivalNum = state.overlays.length;
+  const xVariation = (arrivalNum % 3) * 30 - 30; // -30, 0, or 30 pixels
+  const yVariation = Math.floor(arrivalNum / 3) * 25 - 25; // Vary vertically too
+  const xOff = xVariation;
+  const yOff = yVariation;
   // Only queue the plane artwork (no color mask)
   state.overlays.push({ img: entry.img, alpha: 0, xOff, yOff, greyed: false, t0: performance.now() });
     // soften oldest if >3
@@ -3734,7 +3909,7 @@ __dbg.log('[zone1] main.js executing');
       oldest.alpha = Math.min(oldest.alpha, 0.15);
     }
 
-    // Activate overlay hotspots as a batch (red islands from PLANEOVERLAY1 COLORS)
+    // Overlay hotspots disabled - just show plane artwork without red highlights
     try{
       // As the overlay arrives, activate overlay nav union so walkability includes PLANEOVERLAY1 COLORS blue
       state.overlayNavActive = true;
@@ -3743,23 +3918,24 @@ __dbg.log('[zone1] main.js executing');
       const soon = performance.now() + 50;
       state.agents.forEach(a => { a.nextRepathAt = Math.min(a.nextRepathAt||0, soon); });
 
-      if (state.overlayHotspotTemplates && state.overlayHotspotTemplates.length){
-        const batchId = state.overlayBatchSeq++;
-        state.activeOverlayBatchId = batchId;
-        const clones = state.overlayHotspotTemplates.map((t, i) => ({
-          ...t,
-          id: `hs_overlay_${batchId}_${i}`,
-          completed: false,
-          fadeStartTs: 0, fadeEndTs: 0, fadeDur: 0,
-          overlayActive: t.overlayActive, overlayDone: t.overlayDone,
-          batchId
-        }));
-        // Merge into active hotspots list
-        state.hotspots.push(...clones);
-        // Map this batch id to the overlay index (most-recent overlay pushed)
-        try{ state.batchIdToOverlayIdx = state.batchIdToOverlayIdx || {}; state.batchIdToOverlayIdx[batchId] = Math.max(0, state.overlays.length - 1); }catch{}
-        __dbg.log('[zone1] overlay hotspots activated:', clones.length, 'batch', batchId);
-      }
+      // Hotspot activation disabled to remove red highlights from plane overlays
+      // if (state.overlayHotspotTemplates && state.overlayHotspotTemplates.length){
+      //   const batchId = state.overlayBatchSeq++;
+      //   state.activeOverlayBatchId = batchId;
+      //   const clones = state.overlayHotspotTemplates.map((t, i) => ({
+      //     ...t,
+      //     id: `hs_overlay_${batchId}_${i}`,
+      //     completed: false,
+      //     fadeStartTs: 0, fadeEndTs: 0, fadeDur: 0,
+      //     overlayActive: t.overlayActive, overlayDone: t.overlayDone,
+      //     batchId
+      //   }));
+      //   // Merge into active hotspots list
+      //   state.hotspots.push(...clones);
+      //   // Map this batch id to the overlay index (most-recent overlay pushed)
+      //   try{ state.batchIdToOverlayIdx = state.batchIdToOverlayIdx || {}; state.batchIdToOverlayIdx[batchId] = Math.max(0, state.overlays.length - 1); }catch{}
+      //   __dbg.log('[zone1] overlay hotspots activated:', clones.length, 'batch', batchId);
+      // }
     }catch{}
   }
 
@@ -4146,11 +4322,11 @@ __dbg.log('[zone1] main.js executing');
   function positionDecor() {
     // Layout minimap relative to active zone panel
     try{ layoutMinimap(); }catch{}
-    // Avatar position
+    // Avatar position - only show in Zone 1
     const a = worldToScreen(state.player.x, state.player.y);
     avatarEl.style.left = `${a.x}px`;
     avatarEl.style.top = `${a.y}px`;
-    avatarEl.style.display = 'block'; // Ensure visible
+    avatarEl.style.display = (state.activeZone === 0) ? 'block' : 'none';
 
     // Pips
     for (const hs of state.hotspots) {
@@ -4264,28 +4440,41 @@ __dbg.log('[zone1] main.js executing');
     const totalCP = checkpoints.length || 1;
     state.mgCut.checkpoints = checkpoints; state.mgCut.hits = 0; state.mgCut.total = totalCP;
 
-    // Prebuild a single-pixel edge raster to draw a clean red outline (reduces many red lines)
-    const edgeCan = document.createElement('canvas'); edgeCan.width = bw; edgeCan.height = bh;
-    const edgeCtx = edgeCan.getContext('2d');
-    const edgeImg = edgeCtx.createImageData(bw, bh); const ed = edgeImg.data;
-    for (let y=1; y<bh-1; y++){
-      for (let x=1; x<bw-1; x++){
-        const a = alphaAt(x,y); if (a<10) continue;
-        // if any neighbor is out, this is an edge pixel
-        if (alphaAt(x-1,y)<10 || alphaAt(x+1,y)<10 || alphaAt(x,y-1)<10 || alphaAt(x,y+1)<10 || alphaAt(x-1,y-1)<10 || alphaAt(x+1,y-1)<10 || alphaAt(x-1,y+1)<10 || alphaAt(x+1,y+1)<10){
-          const o = ((y*bw + x)<<2);
-          ed[o] = 220; ed[o+1] = 40; ed[o+2] = 40; ed[o+3] = 255; // red edge pixel
+    // Build smooth outline path from boundary points instead of pixel-by-pixel
+    // Sort boundary points to create a continuous path
+    const edgePath = [];
+    if (boundary.length > 0) {
+      const used = new Set();
+      let current = boundary[0];
+      edgePath.push(current);
+      used.add(0);
+      
+      // Greedy nearest-neighbor to form continuous path
+      while (edgePath.length < boundary.length) {
+        let nearestIdx = -1;
+        let nearestDist = Infinity;
+        for (let i = 0; i < boundary.length; i++) {
+          if (used.has(i)) continue;
+          const b = boundary[i];
+          const d = Math.hypot(b.x - current.x, b.y - current.y);
+          if (d < nearestDist) {
+            nearestDist = d;
+            nearestIdx = i;
+          }
         }
+        if (nearestIdx === -1 || nearestDist > 20) break; // discontinuity
+        current = boundary[nearestIdx];
+        edgePath.push(current);
+        used.add(nearestIdx);
       }
     }
-    edgeCtx.putImageData(edgeImg, 0, 0);
-    state.mgCut._edgeCan = edgeCan;
+    state.mgCut._edgePath = edgePath;
 
     // Persistent cut-progress overlay (bright line shows where you've cut already)
     const cutCan = document.createElement('canvas'); cutCan.width = bw; cutCan.height = bh;
     const cutCtx = cutCan.getContext('2d');
     cutCtx.lineCap = 'round'; cutCtx.lineJoin = 'round';
-    cutCtx.strokeStyle = 'rgba(255,255,255,0.96)';
+    cutCtx.strokeStyle = 'rgba(0,150,0,0.7)'; // green for completed path
     cutCtx.lineWidth = 3;
     state.mgCut._cutCan = cutCan; state.mgCut._cutCtx = cutCtx; state.mgCut._lastHit = null;
 
@@ -4294,25 +4483,65 @@ __dbg.log('[zone1] main.js executing');
     const offX = (W - bw*s)/2; const offY = (H - bh*s)/2;
     state.mgCut._frag = frag; state.mgCut._scale = s; state.mgCut._offX = offX; state.mgCut._offY = offY;
 
-  // Tool torch state + energy visuals + live precision
-  let toolX = W/2, toolY = H/2; let lastMX = toolX, lastMY = toolY; let lastSoundAt = 0;
-  let heat = 0; let finishedPulse=0; let dropT=0; state.mgCut._raf = 0;
+  // Tool state for clean technical aesthetic
+  let toolX = W/2, toolY = H/2; let lastMX = toolX, lastMY = toolY;
+  let finishedPulse=0; let dropT=0; state.mgCut._raf = 0;
   // Live precision state
   let precision = 1.0;            // 0..1 (start at 1)
   let lastPrecision = 1.0;        // for change detection
   let lastPrecChangeAt = 0;       // ms, for numeric flash
   let precFlashUntil = 0;         // show numeric label briefly
-  let lowRumbleGain = 0;          // 0..1 for mechanical rumble
-  let staticAmt = 0;              // 0..1 for noisy artifact layer
   const prec = { cur: 1, target: 1 };
-    const sparks = [];
-
-    function spawnSparks(x,y, n){ for (let i=0;i<n;i++){ const ang=Math.random()*Math.PI*2; const sp=30+Math.random()*60; sparks.push({x,y,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,t:0,life:0.3+Math.random()*0.5}); } }
-    function heatColor(){ const h=Math.max(0,Math.min(1,heat)); if(h<0.33){return `rgba(255,255,${Math.round(255*h/0.33)},0.9)`;} if(h<0.66){const k=(h-0.33)/0.33; return `rgba(255,${Math.round(255*(1-k))},0,0.9)`;} const k=(h-0.66)/0.34; return `rgba(${255-Math.round(80*k)},${50-Math.round(40*k)},0,0.9)`; }
-    function drawLightTableBG(){ ctx.fillStyle='#fafafa'; ctx.fillRect(0,0,W,H); const g=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*0.5,W/2,H/2,Math.max(W,H)*0.9); g.addColorStop(0,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,0.08)'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H); }
+    function drawLightTableBG(){ 
+      // Clean white technical drawing surface with subtle grid
+      ctx.fillStyle='#ffffff'; 
+      ctx.fillRect(0,0,W,H); 
+      // Technical grid pattern
+      ctx.save();
+      ctx.strokeStyle='rgba(0,0,0,0.05)';
+      ctx.lineWidth = 1;
+      const gridSize = 40;
+      for (let x = 0; x < W; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, H);
+        ctx.stroke();
+      }
+      for (let y = 0; y < H; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(W, y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
     function drawStressNearTool(){ ctx.save(); ctx.globalAlpha=0.08+heat*0.08; ctx.strokeStyle='#000'; ctx.lineWidth=1; const r=36+heat*24; const rings=3; for(let i=1;i<=rings;i++){ const rr=(r*i)/rings; ctx.beginPath(); for(let a=0;a<Math.PI*2; a+=Math.PI/24){ const wob=Math.sin(performance.now()/180 + a*4)*(1+heat*2); const x=toolX + Math.cos(a)*(rr + wob); const y=toolY + Math.sin(a)*(rr + wob*0.7); if(a===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);} ctx.stroke(); } ctx.restore(); }
-    function drawTorch(){ const radius=12+heat*8; const grad=ctx.createRadialGradient(toolX,toolY,0,toolX,toolY,radius); grad.addColorStop(0,'rgba(255,255,255,0.95)'); grad.addColorStop(0.4,'rgba(255,220,160,0.45)'); grad.addColorStop(1,'rgba(255,120,60,0.12)'); ctx.save(); ctx.globalCompositeOperation='lighter'; ctx.fillStyle=grad; ctx.beginPath(); ctx.arc(toolX,toolY,radius,0,Math.PI*2); ctx.fill(); ctx.restore(); }
-    function drawSparks(dt){ if(!sparks.length) return; ctx.save(); ctx.globalCompositeOperation='lighter'; for(let i=sparks.length-1;i>=0;i--){ const p=sparks[i]; p.t+=dt; if(p.t>=p.life){ sparks.splice(i,1); continue;} p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=80*dt; const k=1-(p.t/p.life); ctx.globalAlpha=Math.max(0,k)*0.9; ctx.fillStyle=`rgba(255,${Math.round(160+80*k)},${Math.round(60+120*k)},1)`; ctx.beginPath(); ctx.arc(p.x,p.y,1.5+1.5*k,0,Math.PI*2); ctx.fill(); } ctx.restore(); }
+    function drawTorch(){ 
+      // Clean circular cutting tool indicator
+      const radius=10;
+      ctx.save();
+      // Outer ring
+      ctx.strokeStyle = 'rgba(0,0,0,0.6)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(toolX, toolY, radius, 0, Math.PI*2);
+      ctx.stroke();
+      // Inner crosshair for precision
+      ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(toolX - radius, toolY);
+      ctx.lineTo(toolX + radius, toolY);
+      ctx.moveTo(toolX, toolY - radius);
+      ctx.lineTo(toolX, toolY + radius);
+      ctx.stroke();
+      // Center dot
+      ctx.fillStyle = precision > 0.7 ? 'rgba(0,120,0,0.6)' : 'rgba(180,50,50,0.6)';
+      ctx.beginPath();
+      ctx.arc(toolX, toolY, 3, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
     function runCutLoop(now){
       const dt=Math.min(0.033, (now - (state.mgCut._lastCutTs||now))/1000);
       state.mgCut._lastCutTs=now;
@@ -4336,25 +4565,33 @@ __dbg.log('[zone1] main.js executing');
       prec.target = Math.max(0, Math.min(1, devScore * (1 - 0.6*speedPenalty) - envPenalty*0.4));
       // Smooth precision response (lag + ease)
       precision += (prec.target - precision) * (0.08 + 0.12*(1-precision));
-      staticAmt = Math.max(0, 1 - precision) * 0.6;
-      lowRumbleGain += ((precision < 0.5 ? (0.5 - precision) : 0) - lowRumbleGain) * 0.08;
       // Numeric flash when precision changes sharply (>8%)
       if (Math.abs(precision - lastPrecision) > 0.08){ lastPrecision = precision; lastPrecChangeAt = performance.now(); precFlashUntil = lastPrecChangeAt + 700; }
 
-      const shake=heat>0.05? (Math.random()-0.5)*(1+heat*2):0;
       ctx.save();
-      ctx.translate(shake, -shake*0.5);
       // background and fragment
       drawLightTableBG();
       const dropY = dropT>0 ? (Math.sin(dropT*3.14)*8) : 0;
       try{ ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high'; ctx.drawImage(frag,0,0,bw,bh, offX, offY+dropY, bw*s, bh*s);}catch{}
-      // Single red outline from prebuilt edge raster (cleaner look, fewer lines)
+      // Draw smooth technical outline from path points
       try{
-        ctx.save();
-        ctx.globalAlpha = 0.55; // de-emphasize uncut edge
-        ctx.imageSmoothingEnabled = false; // keep edge crisp
-        ctx.drawImage(state.mgCut._edgeCan, 0,0,bw,bh, offX, offY+dropY, bw*s, bh*s);
-        ctx.restore();
+        const edgePath = state.mgCut._edgePath;
+        if (edgePath && edgePath.length > 1) {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(180, 50, 50, 0.85)'; // muted red, technical
+          ctx.lineWidth = 2.5;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.setLineDash([8, 4]); // dashed line for technical drawing aesthetic
+          ctx.beginPath();
+          ctx.moveTo(offX + edgePath[0].x * s, offY + dropY + edgePath[0].y * s);
+          for (let i = 1; i < edgePath.length; i++) {
+            ctx.lineTo(offX + edgePath[i].x * s, offY + dropY + edgePath[i].y * s);
+          }
+          ctx.closePath();
+          ctx.stroke();
+          ctx.restore();
+        }
       }catch{}
       // Draw the persistent bright cut path overlay
       try{
@@ -4362,10 +4599,8 @@ __dbg.log('[zone1] main.js executing');
         ctx.drawImage(state.mgCut._cutCan, 0,0,bw,bh, offX, offY+dropY, bw*s, bh*s);
         ctx.restore();
       }catch{}
-      // stress field + torch + sparks
-      drawStressNearTool();
+      // Clean cutting tool indicator
       drawTorch();
-      drawSparks(dt);
       if(finishedPulse>0){ const k=finishedPulse; const R=Math.max(W,H)*k; const rg=ctx.createRadialGradient(toolX,toolY,R*0.2,toolX,toolY,R); rg.addColorStop(0,'rgba(255,255,255,0.35)'); rg.addColorStop(1,'rgba(255,255,255,0)'); ctx.save(); ctx.fillStyle=rg; ctx.fillRect(0,0,W,H); ctx.restore(); finishedPulse=Math.max(0, finishedPulse - dt*1.8);} 
       // precision gauge and effects
       drawPrecisionGauge(ctx, W, H, precision, { pulse:true, flicker:true, flashUntil:precFlashUntil });
@@ -4381,9 +4616,9 @@ __dbg.log('[zone1] main.js executing');
       const mx = (e.clientX - rect.left) * (c.width / rect.width);
       const my = (e.clientY - rect.top)  * (c.height / rect.height);
       lastMX = mx; lastMY = my;
-      // Resistive motion with human wobble
-      toolX += (mx - toolX) * 0.35; toolY += (my - toolY) * 0.35;
-      toolX += Math.sin(performance.now()/160)*0.4; toolY += Math.cos(performance.now()/190)*0.35;
+      // Smooth direct motion for precision control
+      toolX += (mx - toolX) * 0.5; 
+      toolY += (my - toolY) * 0.5;
       // Hit detection against boundary checkpoints
       let changed = false; const tol = CONFIG.cut.tolerance;
       for (const cp of checkpoints){ if (cp.hit) continue; const x = offX + cp.x*s; const y = offY + cp.y*s; const d = Math.hypot(toolX - x, toolY - y); if (d <= tol) { cp.hit = true; changed = true; } }
@@ -4513,78 +4748,138 @@ __dbg.log('[zone1] main.js executing');
     if (!ctx || !canvas) return;
     const W = canvas.width, H = canvas.height;
     ctx.clearRect(0,0,W,H);
-    // base panel (light table style)
-    ctx.save();
-    ctx.fillStyle = '#fafafa';
+    // Clean white background with subtle grid
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(0,0,W,H);
+    // Technical grid pattern
+    ctx.save();
+    ctx.strokeStyle='rgba(0,0,0,0.05)';
+    ctx.lineWidth = 1;
+    const gridSize = 40;
+    for (let x = 0; x < W; x += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, H);
+      ctx.stroke();
+    }
+    for (let y = 0; y < H; y += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+    
+    ctx.save();
     ctx.translate(W/2, H/2);
 
-    // timer ring (outer) based on remaining time
+    // Timer progress bar at top (simple black bar)
     const total = CONFIG.torque.timeLimitMs;
     const leftMs = Math.max(0, mg.deadline ? (mg.deadline - performance.now()) : total);
     const tFrac = Math.max(0, Math.min(1, leftMs / total));
-    const ringR = Math.min(W,H)*0.44;
-    ctx.lineWidth = 8;
-    // background ring (light grey on white)
-    ctx.strokeStyle = 'rgba(0,0,0,.08)';
-    ctx.beginPath(); ctx.arc(0,0, ringR, 0, Math.PI*2); ctx.stroke();
-  // foreground ring (countdown)
-    const startA = -Math.PI/2;
-    const endA = startA + (Math.PI*2 * tFrac);
-  // Always render countdown in red to emphasize time pressure
-  ctx.strokeStyle = '#cc0000';
-    ctx.beginPath(); ctx.arc(0,0, ringR, startA, endA, false); ctx.stroke();
-
-    // dial circle
-    const R = Math.min(W,H)*0.36;
-    ctx.strokeStyle = '#e3e7ee'; ctx.lineWidth = 10; ctx.beginPath(); ctx.arc(0,0,R,0,Math.PI*2); ctx.stroke();
-    // ticks
-    ctx.strokeStyle = 'rgba(0,0,0,.18)'; ctx.lineWidth = 2;
-    for (let i=0;i<60;i++){
-      const ang=i*(Math.PI*2/60); const r1=R-8, r2=R-18;
-      ctx.beginPath(); ctx.moveTo(Math.cos(ang)*r1, Math.sin(ang)*r1); ctx.lineTo(Math.cos(ang)*r2, Math.sin(ang)*r2); ctx.stroke();
-    }
-    // green zone arc
-    const s = mg.zoneStart - Math.PI/2; // rotate so 0 at top
-    const e = mg.zoneEnd   - Math.PI/2;
-    ctx.strokeStyle = '#2fbf7a'; ctx.lineWidth = 14; ctx.lineCap='round';
-    if (mg.zoneStart <= mg.zoneEnd){
-      ctx.beginPath(); ctx.arc(0,0,R, s, e); ctx.stroke();
-    } else {
-      // wrapped zone: draw in two segments
-      ctx.beginPath(); ctx.arc(0,0,R, s, s + Math.PI*2); ctx.stroke();
-      ctx.beginPath(); ctx.arc(0,0,R, -Math.PI/2, e); ctx.stroke();
-    }
-
-    // bolt visualization at center (rotates as hits accrue)
     ctx.save();
-    const slide = mg.slideY || 0; 
-    ctx.translate(0, -slide);
-    ctx.rotate(mg.boltAngle);
-    ctx.fillStyle = '#c7ccd6';
-    ctx.beginPath(); ctx.rect(-10,-10,20,20); ctx.fill();
-    ctx.strokeStyle = '#3a445b'; ctx.lineWidth = 2; ctx.strokeRect(-10,-10,20,20);
+    ctx.translate(-W/2, -H/2);
+    const barW = W - 80;
+    const barH = 8;
+    const barX = 40;
+    const barY = 30;
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(barX, barY, barW, barH);
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(barX, barY, barW * tFrac, barH);
     ctx.restore();
 
-    // needle
+    // Main dial circle (simple black outline)
+    const R = Math.min(W,H)*0.36;
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0,0,R,0,Math.PI*2);
+    ctx.stroke();
+    
+    // Simple tick marks (every 30 degrees)
+    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+    ctx.lineWidth = 2;
+    for (let i=0;i<12;i++){
+      const ang=i*(Math.PI*2/12);
+      const r1=R-8;
+      const r2=R-20;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(ang)*r1, Math.sin(ang)*r1);
+      ctx.lineTo(Math.cos(ang)*r2, Math.sin(ang)*r2);
+      ctx.stroke();
+    }
+    
+    // Target zone (simple green arc)
+    const s = mg.zoneStart - Math.PI/2;
+    const e = mg.zoneEnd   - Math.PI/2;
+    ctx.strokeStyle = '#00aa00';
+    ctx.lineWidth = 12;
+    ctx.lineCap='butt';
+    if (mg.zoneStart <= mg.zoneEnd){
+      ctx.beginPath();
+      ctx.arc(0,0,R, s, e);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.arc(0,0,R, s, s + Math.PI*2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0,0,R, -Math.PI/2, e);
+      ctx.stroke();
+    }
+
+    // Central bolt (simple square)
+    ctx.save();
+    ctx.rotate(mg.boltAngle);
+    ctx.fillStyle = '#cccccc';
+    ctx.fillRect(-12,-12,24,24);
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-12,-12,24,24);
+    // Cross pattern on bolt
+    ctx.strokeStyle = '#666666';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-12, 0);
+    ctx.lineTo(12, 0);
+    ctx.moveTo(0, -12);
+    ctx.lineTo(0, 12);
+    ctx.stroke();
+    ctx.restore();
+
+    // Needle (simple black line)
     const a = mg.angle - Math.PI/2;
-    ctx.strokeStyle = '#111'; ctx.lineWidth = 4; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(Math.cos(a)*R, Math.sin(a)*R); ctx.stroke();
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(Math.cos(a)*(R-10), Math.sin(a)*(R-10));
+    ctx.stroke();
 
-    // hub
-    ctx.fillStyle='#333'; ctx.beginPath(); ctx.arc(0,0,6,0,Math.PI*2); ctx.fill();
+    // Center dot
+    ctx.fillStyle='#000000';
+    ctx.beginPath();
+    ctx.arc(0,0,5,0,Math.PI*2);
+    ctx.fill();
 
-    // feedback flashes
+    // Feedback flash (subtle)
     if (mg.flashUntil && performance.now() < mg.flashUntil){
-      ctx.globalAlpha = 0.18;
-      ctx.fillStyle = mg.flashKind==='hit' ? '#43d18a' : '#ff5b5b';
-      ctx.beginPath(); ctx.arc(0,0,R+18,0,Math.PI*2); ctx.fill();
+      ctx.globalAlpha = 0.15;
+      ctx.fillStyle = mg.flashKind==='hit' ? '#00ff00' : '#ff0000';
+      ctx.beginPath();
+      ctx.arc(0,0,R+10,0,Math.PI*2);
+      ctx.fill();
       ctx.globalAlpha = 1;
     }
 
-    // text
-    ctx.fillStyle = '#111'; ctx.font = '600 20px system-ui,Segoe UI'; ctx.textAlign='center';
-    ctx.fillText('Apply Torque', 0, -R-24);
+    // Label text
+    ctx.fillStyle = '#000000';
+    ctx.font = '600 16px ui-monospace, SFMono-Regular, "Courier New", monospace';
+    ctx.textAlign='center';
+    ctx.fillText('PRESS E WHEN NEEDLE IS IN GREEN ZONE', 0, R + 40);
     ctx.restore();
   }
   function startTorque(hs){
@@ -4784,87 +5079,124 @@ __dbg.log('[zone1] main.js executing');
   }
 
   function drawHold(ctx, canvas, mg, zone){
-    const W=canvas.width, H=canvas.height; ctx.clearRect(0,0,W,H);
-    // background isolation
-    ctx.fillStyle = '#f7f8fa'; ctx.fillRect(0,0,W,H);
-    // Environment silhouettes: cranes/scaffolding and faint crowd hints
-    if (CONFIG.hold?.env?.silhouettes){
-      ctx.save(); ctx.globalAlpha = 0.07; ctx.strokeStyle = '#1b2438'; ctx.lineWidth = 2;
-      // simple crane outline left
-      ctx.beginPath(); ctx.moveTo(90, H*0.65); ctx.lineTo(220,120); ctx.lineTo(260,120); ctx.lineTo(180, H*0.65); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(W-120, H*0.7); ctx.lineTo(W-260, 140); ctx.lineTo(W-220, 140); ctx.lineTo(W-160, H*0.7); ctx.stroke();
-      ctx.restore();
-    }
-    if (CONFIG.hold?.env?.crowdHints){
-      ctx.save(); ctx.globalAlpha = 0.05; ctx.fillStyle = '#0e0f12';
-      for (let i=0;i<14;i++){ const x = (i*W/14) + ((i%2)*10); const y = H*0.85 + Math.sin((mg.bgT*0.8)+i)*3; ctx.fillRect(x, y, 5, 16);} ctx.restore();
-    }
-  // Living stability bar (mechanical gauge)
-    const barH=12; const pad=16; const frac = Math.min(1, Math.abs(mg.angle)/(mg.threshold.red*1.2));
-    const wobble = (Math.sin(mg.bgT*13) * 0.03) + (mg.angVel*0.08);
-    const effective = Math.max(0, Math.min(1, (1-frac) + wobble));
-    const col = zone==='white'?'#ffffff': zone==='amber'?'#ffbf3b':'#ff5b5b';
-    ctx.fillStyle = 'rgba(0,0,0,0.08)'; ctx.fillRect(pad,pad,W-pad*2,barH);
-    ctx.fillStyle = col; ctx.fillRect(pad,pad, (W-pad*2)*effective, barH);
-    // Analog tick marks
-    ctx.save(); ctx.globalAlpha=0.35; ctx.strokeStyle='rgba(0,0,0,0.25)'; for(let i=0;i<=10;i++){ const x=pad + (W-pad*2)*(i/10); ctx.beginPath(); ctx.moveTo(x,pad); ctx.lineTo(x,pad+barH); ctx.stroke(); } ctx.restore();
-  // Hold timer/progress (how long to keep stable)
-  const holdPadTop = pad + barH + 10;
-  const reqMs = mg.requireMs || 4000; const remaining = Math.max(0, (reqMs - mg.stableFor));
-  const holdFrac = Math.max(0, Math.min(1, mg.stableFor / reqMs));
-  ctx.fillStyle = 'rgba(0,0,0,0.08)'; ctx.fillRect(pad,holdPadTop,W-pad*2,barH);
-  ctx.fillStyle = '#2fbf7a'; // progress to clamp
-  ctx.fillRect(pad,holdPadTop, (W-pad*2)*holdFrac, barH);
-  // Label: remaining seconds
-  ctx.save(); ctx.fillStyle = '#0f5132'; ctx.font = '600 13px system-ui,Segoe UI'; ctx.textAlign = 'right';
-  ctx.fillText(`Hold steady: ${(remaining/1000).toFixed(1)}s`, W-pad, holdPadTop - 3);
-  ctx.restore();
-  // Background tinting removed: keep the overlay background flat
-    // Suspended component
+    const W=canvas.width, H=canvas.height;
+    ctx.clearRect(0,0,W,H);
+    // Clean white background with subtle grid
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0,0,W,H);
+    // Technical grid pattern
     ctx.save();
-    const cx=W/2, cy=H*0.52; // pivot point
-    // overhead light and cables
-    ctx.fillStyle = 'rgba(0,0,0,0.08)'; ctx.fillRect(0,0,W,40);
-    // Cables
-    ctx.strokeStyle = 'rgba(40,48,66,0.6)'; ctx.lineWidth=3;
-    const spread=120; const stretch = mg.angle*40;
-    ctx.beginPath(); ctx.moveTo(cx-spread,0); ctx.lineTo(cx-40,cy-170 + stretch); ctx.moveTo(cx+spread,0); ctx.lineTo(cx+40,cy-170 - stretch); ctx.stroke();
-    // Shadow follows sway
-    const shOff = mg.angle*120;
-    ctx.save(); ctx.translate(shOff,20); ctx.fillStyle='rgba(0,0,0,0.08)'; ctx.beginPath(); ctx.ellipse(cx, H*0.88, 220, 26, 0,0,Math.PI*2); ctx.fill(); ctx.restore();
-    // Payload
+    ctx.strokeStyle='rgba(0,0,0,0.05)';
+    ctx.lineWidth = 1;
+    const gridSize = 40;
+    for (let x = 0; x < W; x += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, H);
+      ctx.stroke();
+    }
+    for (let y = 0; y < H; y += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
+      ctx.stroke();
+    }
+    ctx.restore();
+    
+    // Stability indicator bars at top
+    const barH=12;
+    const pad=20;
+    
+    // Current tilt indicator (simple bar)
+    const frac = Math.min(1, Math.abs(mg.angle)/(mg.threshold.red*1.2));
+    const barCol = zone==='white'?'#00aa00': zone==='amber'?'#ffaa00':'#ff0000';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(pad, pad, W-pad*2, barH);
+    ctx.fillStyle = barCol;
+    ctx.fillRect(pad, pad, (W-pad*2)*(1-frac), barH);
+    
+    // Hold duration progress bar
+    const holdPadTop = pad + barH + 12;
+    const reqMs = mg.requireMs || 4000;
+    const remaining = Math.max(0, (reqMs - mg.stableFor));
+    const holdFrac = Math.max(0, Math.min(1, mg.stableFor / reqMs));
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(pad, holdPadTop, W-pad*2, barH);
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(pad, holdPadTop, (W-pad*2)*holdFrac, barH);
+    
+    // Label text
+    ctx.fillStyle = '#000000';
+    ctx.font = '600 14px ui-monospace, SFMono-Regular, "Courier New", monospace';
+    ctx.textAlign = 'right';
+    ctx.fillText(`HOLD STABLE: ${(remaining/1000).toFixed(1)}S`, W-pad, holdPadTop - 4);
+    
+    // Suspended component (simplified technical drawing)
+    ctx.save();
+    const cx=W/2, cy=H*0.55;
+    
+    // Cables (simple black lines)
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    const spread=100;
+    const stretch = mg.angle*40;
+    ctx.beginPath();
+    ctx.moveTo(cx-spread, pad + barH + 40);
+    ctx.lineTo(cx-30, cy-140 + stretch);
+    ctx.moveTo(cx+spread, pad + barH + 40);
+    ctx.lineTo(cx+30, cy-140 - stretch);
+    ctx.stroke();
+    
+    // Shadow (simple ellipse)
+    const shOff = mg.angle*100;
+    ctx.save();
+    ctx.translate(shOff, 0);
+    ctx.fillStyle='rgba(0,0,0,0.1)';
+    ctx.beginPath();
+    ctx.ellipse(cx, H*0.88, 180, 20, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+    
+    // Component box
     ctx.translate(cx, cy);
     ctx.rotate(mg.angle);
-    const w=380,h=180; ctx.fillStyle='#d7dde7'; ctx.strokeStyle='#2a344b'; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.roundRect?.(-w/2,-h/2,w,h,18);
-    if (!ctx.roundRect){ ctx.rect(-w/2,-h/2,w,h); }
-    ctx.fill(); ctx.stroke();
-    // panel seams
-    ctx.strokeStyle='rgba(0,0,0,0.18)'; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(-w/2+20,-h/2+50); ctx.lineTo(w/2-20,-h/2+50); ctx.moveTo(-w/2+20,h/2-50); ctx.lineTo(w/2-20,h/2-50); ctx.stroke();
-    // Micro stress visuals near edges when red
-    if (zone==='red'){
-      ctx.save(); ctx.strokeStyle='rgba(255,90,90,0.6)'; ctx.lineWidth=1;
-      for (let i=0;i<3;i++){ const rx=(Math.random()-0.5)*w*0.6, ry=(Math.random()-0.5)*h*0.5; ctx.beginPath(); ctx.moveTo(rx, -h/2); ctx.lineTo(rx + Math.random()*8 - 4, -h/2 - 8 - Math.random()*10); ctx.stroke(); }
-      ctx.restore();
-    }
+    const w=300, h=150;
+    ctx.fillStyle='#ffffff';
+    ctx.strokeStyle='#000000';
+    ctx.lineWidth=3;
+    ctx.fillRect(-w/2, -h/2, w, h);
+    ctx.strokeRect(-w/2, -h/2, w, h);
+    
+    // Panel lines
+    ctx.strokeStyle='rgba(0,0,0,0.3)';
+    ctx.lineWidth=1;
+    ctx.beginPath();
+    ctx.moveTo(-w/2+30,-h/2+40);
+    ctx.lineTo(w/2-30,-h/2+40);
+    ctx.moveTo(-w/2+30,h/2-40);
+    ctx.lineTo(w/2-30,h/2-40);
+    ctx.stroke();
+    
     ctx.restore();
+    
     // Status text
     ctx.save();
-    ctx.fillStyle = zone==='white' ? '#111' : (zone==='amber' ? '#9a5d00' : '#a10000');
-    ctx.font='600 18px system-ui,Segoe UI'; ctx.textAlign='center';
-    const tx = zone==='white' ? 'Stable' : zone==='amber' ? 'Tilting' : 'UNSTABLE';
-    const jitter = zone==='white' ? 0 : (zone==='amber' ? 1.5 : 3.5);
-    ctx.fillText(tx, W/2 + (Math.random()-0.5)*jitter, H-24 + (Math.random()-0.5)*jitter);
+    ctx.fillStyle = '#000000';
+    ctx.font='600 18px ui-monospace, SFMono-Regular, "Courier New", monospace';
+    ctx.textAlign='center';
+    const tx = zone==='white' ? 'STABLE' : zone==='amber' ? 'TILTING' : 'UNSTABLE';
+    ctx.fillText(tx, W/2, H-30);
     ctx.restore();
-    // Sparks near cable joins when red
-    if (zone==='red'){
-      ctx.save(); ctx.globalAlpha=0.7; ctx.strokeStyle='#ffcf57'; ctx.lineWidth=2;
-      const sx1 = W/2 - 40, sy1 = H*0.52 - 170 + stretch; const sx2 = W/2 + 40, sy2 = H*0.52 - 170 - stretch;
-      for (let i=0;i<2;i++){ const dx = (Math.random()*14-7), dy = (Math.random()*10-5); ctx.beginPath(); ctx.moveTo(sx1, sy1); ctx.lineTo(sx1+dx, sy1+dy); ctx.stroke(); }
-      for (let i=0;i<2;i++){ const dx = (Math.random()*14-7), dy = (Math.random()*10-5); ctx.beginPath(); ctx.moveTo(sx2, sy2); ctx.lineTo(sx2+dx, sy2+dy); ctx.stroke(); }
-      ctx.restore();
-    }
+    
+    // Arrow keys instruction
+    ctx.save();
+    ctx.fillStyle = '#000000';
+    ctx.font='600 14px ui-monospace, SFMono-Regular, "Courier New", monospace';
+    ctx.textAlign='center';
+    ctx.fillText('USE ARROW KEYS OR A/D TO BALANCE', W/2, H-10);
+    ctx.restore();
   }
 
   function endHold(success, opts={}){
@@ -5481,6 +5813,9 @@ __dbg.log('[zone1] main.js executing');
     // Show delivery toast
     toast(`DELIVERED → +${steel}S +${plastic}P +${composite}C`, 'ok');
     
+    // Show delivery stats popup
+    showDeliveryStats(steel, plastic, composite, c.precision);
+    
     // Check for housing conversion
     checkHousingConversion();
     
@@ -5655,6 +5990,56 @@ __dbg.log('[zone1] main.js executing');
         ctx.fillRect(x, y, dw, dh);
         ctx.globalCompositeOperation = 'source-over';
       }
+      // Instruction text above crate (shows different text when carried vs not carried)
+      if (c.id !== state.carryingCrateId) {
+        ctx.save();
+        const text = 'PICK UP MATERIALS';
+        ctx.font = '700 13px ui-monospace, SFMono-Regular, "Courier New", monospace';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        // Measure text for button sizing
+        const textMetrics = ctx.measureText(text);
+        const textWidth = textMetrics.width;
+        const padding = 16;
+        const buttonWidth = textWidth + padding * 2;
+        const buttonHeight = 32;
+        const buttonX = s.x - buttonWidth / 2;
+        const buttonY = y - buttonHeight - 20; // 20px above crate
+        const cornerRadius = 6;
+        
+        // Draw shadow
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+        ctx.shadowBlur = 6;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 2;
+        
+        // Draw red rounded rectangle background
+        ctx.fillStyle = '#c82333';
+        ctx.beginPath();
+        ctx.moveTo(buttonX + cornerRadius, buttonY);
+        ctx.lineTo(buttonX + buttonWidth - cornerRadius, buttonY);
+        ctx.quadraticCurveTo(buttonX + buttonWidth, buttonY, buttonX + buttonWidth, buttonY + cornerRadius);
+        ctx.lineTo(buttonX + buttonWidth, buttonY + buttonHeight - cornerRadius);
+        ctx.quadraticCurveTo(buttonX + buttonWidth, buttonY + buttonHeight, buttonX + buttonWidth - cornerRadius, buttonY + buttonHeight);
+        ctx.lineTo(buttonX + cornerRadius, buttonY + buttonHeight);
+        ctx.quadraticCurveTo(buttonX, buttonY + buttonHeight, buttonX, buttonY + buttonHeight - cornerRadius);
+        ctx.lineTo(buttonX, buttonY + cornerRadius);
+        ctx.quadraticCurveTo(buttonX, buttonY, buttonX + cornerRadius, buttonY);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Reset shadow for text
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        
+        // Draw white text
+        ctx.fillStyle = '#ffffff';
+        ctx.fillText(text, s.x, buttonY + buttonHeight / 2);
+        ctx.restore();
+      }
       ctx.restore();
     }
   }
@@ -5772,7 +6157,64 @@ __dbg.log('[zone1] main.js executing');
   }
 
   function updateLogistics(dt){ updateTruck(dt); }
-  function drawLogistics(ctx){ drawDeliveryZone(ctx); drawCrates(ctx); }
+  function drawLogistics(ctx){ 
+    drawDeliveryZone(ctx); 
+    drawCrates(ctx);
+  }
+
+  function drawCarriedCrateText(ctx){
+    // Draw instruction above player when carrying a crate
+    if (!state.carryingCrateId) return;
+    const playerScreen = worldToScreen(state.player.x, state.player.y);
+    const nearDropZone = isNearDeliveryZone(state.player.x, state.player.y);
+    ctx.save();
+    const text = nearDropZone ? 'PRESS E TO DROP MATERIALS' : 'MOVE MATERIALS TO DROP OFF ZONE';
+    ctx.font = '700 13px ui-monospace, SFMono-Regular, "Courier New", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Measure text for button sizing
+    const textMetrics = ctx.measureText(text);
+    const textWidth = textMetrics.width;
+    const padding = 16;
+    const buttonWidth = textWidth + padding * 2;
+    const buttonHeight = 32;
+    const buttonX = playerScreen.x - buttonWidth / 2;
+    const buttonY = playerScreen.y - 60; // 60px above player
+    const cornerRadius = 6;
+    
+    // Draw shadow
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 2;
+    
+    // Draw red rounded rectangle background
+    ctx.fillStyle = '#c82333';
+    ctx.beginPath();
+    ctx.moveTo(buttonX + cornerRadius, buttonY);
+    ctx.lineTo(buttonX + buttonWidth - cornerRadius, buttonY);
+    ctx.quadraticCurveTo(buttonX + buttonWidth, buttonY, buttonX + buttonWidth, buttonY + cornerRadius);
+    ctx.lineTo(buttonX + buttonWidth, buttonY + buttonHeight - cornerRadius);
+    ctx.quadraticCurveTo(buttonX + buttonWidth, buttonY + buttonHeight, buttonX + buttonWidth - cornerRadius, buttonY + buttonHeight);
+    ctx.lineTo(buttonX + cornerRadius, buttonY + buttonHeight);
+    ctx.quadraticCurveTo(buttonX, buttonY + buttonHeight, buttonX, buttonY + buttonHeight - cornerRadius);
+    ctx.lineTo(buttonX, buttonY + cornerRadius);
+    ctx.quadraticCurveTo(buttonX, buttonY, buttonX + cornerRadius, buttonY);
+    ctx.closePath();
+    ctx.fill();
+    
+    // Reset shadow for text
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+    
+    // Draw white text
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(text, playerScreen.x, buttonY + buttonHeight / 2);
+    ctx.restore();
+  }
 
   /* -------------------------- BOOTSTRAP -------------------------- */
   loadImages();

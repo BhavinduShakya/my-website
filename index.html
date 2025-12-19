@@ -125,7 +125,7 @@
     
 
       <!-- Hotspot hint textbox -->
-    <div id="hotspot-hint" hidden style="position:absolute;pointer-events:none;transform:translate(-50%,-100%);padding:8px 10px;border-radius:6px;background:#c82333;color:#fff;font-weight:600;box-shadow:0 4px 10px rgba(0,0,0,0.35);white-space:nowrap;">Press E to Disassemble Part</div>
+    <div id="hotspot-hint" hidden style="position:absolute;pointer-events:none;transform:translate(-50%,-100%);padding:8px 10px;border-radius:6px;background:#c82333;color:#fff;font-weight:600;box-shadow:0 4px 10px rgba(0,0,0,0.35);white-space:nowrap;">PRESS E TO DISASSEMBLE PART</div>
 
       <!-- Hidden images the JS will use -->
   <img id="img-base" src="baseimages/BACKGROUND BASE.png" alt="Background base" hidden fetchpriority="high" decoding="async">
@@ -161,7 +161,7 @@
   <!-- Pause / Help -->
   <div id="overlay-help" class="overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="help-title">
     <div class="card">
-      <h2 id="help-title">How to play Zone 1</h2>
+      <h2 id="help-title">OPERATIONAL INSTRUCTIONS</h2>
       <ol>
         <li>Move to a red-highlighted aircraft part to start disassembly.</li>
         <li>Some parts require <em>precision cutting</em>. Others require <em>bolt removal</em>.</li>
@@ -169,19 +169,19 @@
         <li>When crates are full, press <em>Send Crates</em> to ship materials to storage.</li>
       </ol>
       <p class="tip">Tip: hold <kbd>Shift</kbd> to sprint. Press <kbd>Esc</kbd> to pause.</p>
-      <button class="close" data-close="#overlay-help">Close</button>
+      <button class="close" data-close="#overlay-help">CLOSE</button>
     </div>
   </div>
 
   <!-- Precision Cutting Minigame -->
   <div id="overlay-cut" class="overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="cut-title">
     <div class="card wide">
-      <h2 id="cut-title">Precision Cutting</h2>
-      <p class="sub">Trace the path accurately to free the panel.</p>
+      <h2 id="cut-title">PROCEDURE 01: PRECISION CUTTING</h2>
+      <p class="sub">INSTRUCTION: TRACE THE MARKED PATH TO FREE THE COMPONENT.</p>
       <canvas id="cut-canvas" width="1024" height="512"></canvas>
       <div class="actions">
-        <button id="cut-cancel" type="button">Cancel</button>
-        <button id="cut-confirm" type="button" disabled>Confirm Cut</button>
+        <button id="cut-cancel" type="button">ABORT PROCEDURE</button>
+        <button id="cut-confirm" type="button" disabled>CONFIRM CUT</button>
       </div>
     </div>
   </div>
@@ -189,12 +189,12 @@
   <!-- Sequential Torque Minigame -->
   <div id="overlay-bolt" class="overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="torque-title">
     <div class="card">
-      <h2 id="torque-title">Sequential Torque</h2>
-      <p class="sub">Time your press when the needle passes the green zone to loosen the bolt.</p>
+      <h2 id="torque-title">PROCEDURE 02: BOLT REMOVAL</h2>
+      <p class="sub">INSTRUCTION: TIME YOUR INPUT WITHIN THE TARGET ZONE TO RELEASE FASTENER.</p>
       <canvas id="torque-canvas" width="520" height="520" aria-label="Torque gauge"></canvas>
       <div id="torque-readout" class="readout" aria-live="polite">Bolt Integrity: 100%</div>
       <div class="actions">
-        <button id="torque-cancel" type="button">Cancel</button>
+        <button id="torque-cancel" type="button">ABORT PROCEDURE</button>
       </div>
     </div>
   </div>
@@ -202,11 +202,11 @@
   <!-- Hold the Frame Minigame -->
   <div id="overlay-hold" class="overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="hold-title">
     <div class="card wide">
-      <h2 id="hold-title">Hold the Frame</h2>
-      <p class="sub">Keep the suspended component within the stability zone until clamps engage.</p>
+      <h2 id="hold-title">PROCEDURE 03: STABILIZATION</h2>
+      <p class="sub">INSTRUCTION: MAINTAIN COMPONENT WITHIN STABILITY THRESHOLD UNTIL CLAMPS ENGAGE.</p>
       <canvas id="hold-canvas" width="1024" height="540" aria-label="Structural balance test"></canvas>
       <div class="actions">
-        <button id="hold-cancel" type="button">Cancel</button>
+        <button id="hold-cancel" type="button">ABORT PROCEDURE</button>
       </div>
     </div>
   </div>
@@ -214,7 +214,7 @@
   <!-- Results / End-of-Shift -->
   <div id="overlay-results" class="overlay" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="results-title">
     <div class="card">
-      <h2 id="results-title">Shift Summary</h2>
+      <h2 id="results-title">SHIFT SUMMARY</h2>
       <ul id="results-list">
         <!-- JS will populate -->
       </ul>

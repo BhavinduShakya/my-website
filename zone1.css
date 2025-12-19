@@ -395,8 +395,8 @@ button:disabled{opacity:.45; cursor:not-allowed; filter:grayscale(.3)}
 #overlay-cut,
 #overlay-bolt,
 #overlay-hold{
-  background: radial-gradient(1200px 800px at 50% 40%, rgba(255,255,255,.65), rgba(255,255,255,.35));
-  backdrop-filter: blur(2px) saturate(1.05);
+  background: #ffffff;
+  backdrop-filter: none;
   /* Center the minigame content within the left region (viewport minus HUD) */
   padding-right: calc(var(--hud-w, 320px) + var(--hud-gap, 10px));
   justify-items: center;
@@ -405,48 +405,87 @@ button:disabled{opacity:.45; cursor:not-allowed; filter:grayscale(.3)}
 
 .card{
   width:min(720px, calc(100% - 40px));
-  padding:22px 22px 18px;
-  border-radius: var(--radius-2);
-  background: linear-gradient(180deg, #ffffff, #f6f6f6);
-  border:1px solid #27324a;
-  box-shadow: var(--shadow);
-  color:#111;
+  padding:32px;
+  border-radius: 0;
+  background: #ffffff;
+  border:2px solid #000000;
+  box-shadow: none;
+  color:#000000;
 }
-.card.wide{width:min(1100px, calc(100% - 40px))}
+.card.wide{width:min(960px, calc(100% - 40px))}
+.card ol{
+  margin:20px 0;
+  padding-left:24px;
+  font:400 14px/1.6 ui-monospace, SFMono-Regular, 'Courier New', monospace;
+  color:#000000;
+}
+.card ol li{
+  margin-bottom:8px;
+}
 .card h2{
-  margin:0 0 8px;
-  font-weight:700;
-  letter-spacing:.4px;
+  margin:0 0 16px;
+  padding-bottom:16px;
+  border-bottom:2px solid #000000;
+  font:700 24px/1.2 ui-monospace, SFMono-Regular, 'Courier New', monospace;
+  letter-spacing:0.1em;
+  text-transform:uppercase;
 }
-.card .sub{margin:0 0 14px; color:var(--ink-1)}
-.card .tip{color:var(--ink-1)}
-.card .actions{display:flex; gap:12px; justify-content:flex-end; margin-top:14px}
-.card .close{
-  background: linear-gradient(180deg, #e02626, #c41010);
-  border-color: #b20f0f;
-  color:#fff;
+.card .sub{margin:0 0 20px; color:#000000; font:400 14px/1.4 ui-monospace, SFMono-Regular, 'Courier New', monospace;}
+.card .tip{color:#000000; font:400 13px/1.4 ui-monospace, SFMono-Regular, 'Courier New', monospace;}
+.card .actions{display:flex; gap:12px; justify-content:flex-end; margin-top:24px; padding-top:16px; border-top:2px solid #000000;}
+.card .close,
+.card button{
+  background: #ffffff;
+  border:2px solid #000000;
+  color:#000000;
+  padding:12px 24px;
+  font:600 14px/1 ui-monospace, SFMono-Regular, 'Courier New', monospace;
+  letter-spacing:0.05em;
+  cursor:pointer;
+  transition: all 0.15s ease;
 }
-.card .close:hover{ background: linear-gradient(180deg, #f02a2a, #cc1212); border-color:#8f0c0c }
-.card .close:active{ background: linear-gradient(180deg, #c61919, #a90d0d) }
+.card .close:hover,
+.card button:hover{ background: #000000; color:#ffffff; }
+.card .close:active,
+.card button:active{ transform: translateY(1px); }
+.card button:disabled{
+  opacity:0.4;
+  cursor:not-allowed;
+}
+.card button:disabled:hover{
+  background:#ffffff;
+  color:#000000;
+}
+.card button:active{ transform: translateY(1px); }
+.card button:disabled{
+  opacity:0.4;
+  cursor:not-allowed;
+}
+.card button:disabled:hover{
+  background:#ffffff;
+  color:#000000;
+}
 
 /* Precision cutting canvas */
 #cut-canvas{
   width:100%;
   height:420px;
-  background:#fafafa; /* bright drafting surface */
-  border-radius:12px;
-  border:1px solid #243048;
-  box-shadow:0 8px 30px rgba(0,0,0,.08), inset 0 0 0 1px rgba(0,0,0,.04);
+  background:#fafafa;
+  border-radius:0;
+  border:2px solid #000000;
+  box-shadow:none;
+  margin:16px 0;
 }
 
 /* Hold the Frame canvas */
 #hold-canvas{
   width:100%;
   height:420px;
-  background:#f7f8fa;
-  border-radius:12px;
-  border:1px solid #e3e6ef;
-  box-shadow:0 8px 30px rgba(0,0,0,.08), inset 0 0 0 1px rgba(0,0,0,.03);
+  background:#fafafa;
+  border-radius:0;
+  border:2px solid #000000;
+  box-shadow:none;
+  margin:16px 0;
 }
 
 /* Bolt sequence */
@@ -471,18 +510,18 @@ button:disabled{opacity:.45; cursor:not-allowed; filter:grayscale(.3)}
   max-width:520px;
   height:auto;
   background:#fafafa;
-  border:1px solid #e8e8e8;
-  border-radius:12px;
-  box-shadow:0 8px 30px rgba(0,0,0,.08), inset 0 0 0 1px rgba(0,0,0,.04);
+  border:2px solid #000000;
+  border-radius:0;
+  box-shadow:none;
   display:block;
-  margin:8px auto 10px;
+  margin:16px auto;
 }
 #torque-readout{
   text-align:center;
-  color:#cc0000;
-  font-weight:600;
-  letter-spacing:.4px;
-  margin-top:4px;
+  color:#000000;
+  font:600 14px/1.4 ui-monospace, SFMono-Regular, 'Courier New', monospace;
+  letter-spacing:0.05em;
+  margin-top:8px;
 }
 
 /* ===========================
